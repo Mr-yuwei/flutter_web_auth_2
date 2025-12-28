@@ -65,7 +65,13 @@ class AuthenticationManagementActivity : ComponentActivity() {
 
         when (result.resultCode) {
             AuthTabIntent.RESULT_OK -> {
-                callback.success(result.resultUri!!.toString())
+                // 安全调用：resultUri 可能为 null，不要用 !!
+                val uri = result.resultUri
+                if (uri != null) {
+                    callback.success(uri.toString())
+                } else {
+                    callback.error("NO_DATA", "Authentication succeeded but URI is null", null)
+                }
             }
 
             AuthTabIntent.RESULT_CANCELED -> {
