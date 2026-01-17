@@ -10,6 +10,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.result.ActivityResultLauncher
 import androidx.browser.auth.AuthTabIntent
 import androidx.browser.auth.AuthTabIntent.AuthResult
+import android.content.ActivityNotFoundException
 
 class AuthenticationManagementActivity : ComponentActivity() {
     companion object {
@@ -57,7 +58,10 @@ class AuthenticationManagementActivity : ComponentActivity() {
         val currentScheme = callbackScheme ?: ""
         val callback = FlutterWebAuth2Plugin.callbacks[currentScheme]
         if (callback == null) {
-            Log.e("flutter_web_auth_2", "Process likely killed: callback is null for $currentScheme")
+            Log.e(
+                "flutter_web_auth_2",
+                "Process likely killed: callback is null for $currentScheme"
+            )
             finish()
             return
         }
@@ -71,11 +75,17 @@ class AuthenticationManagementActivity : ComponentActivity() {
                     callback.error("NO_DATA", "Authentication succeeded but received no URI", null)
                 }
             }
+
             AuthTabIntent.RESULT_CANCELED -> {
                 callback.error("CANCELED", "User canceled authentication", null)
             }
+
             else -> {
-                callback.error("FAILED", "Authentication failed with code: ${result.resultCode}", null)
+                callback.error(
+                    "FAILED",
+                    "Authentication failed with code: ${result.resultCode}",
+                    null
+                )
             }
         }
 
@@ -107,21 +117,29 @@ class AuthenticationManagementActivity : ComponentActivity() {
                 intent.intent.setPackage(targetPackage)
             }
 
-            if (callbackScheme == "https" && callbackHost != null && callbackPath != null) {
-                Log.d("flutter_web_auth_2", "Using https host and path: $callbackHost, $callbackPath")
-                intent.launch(authLauncher, authenticationUri, callbackHost!!, callbackPath!!)
-            } else {
-                Log.d("flutter_web_auth_2", "Using custom scheme: $callbackScheme")
-                intent.launch(authLauncher, authenticationUri, callbackScheme)
+            try {
+                if (callbackScheme == "https" && callbackHost != null && callbackPath != null) {
+                    Log.d(
+                        "flutter_web_auth_2",
+                        "Using https host and path: $callbackHost, $callbackPath"
+                    )
+                    intent.launch(authLauncher, authenticationUri, callbackHost!!, callbackPath!!)
+                } else {
+                    Log.d("flutter_web_auth_2", "Using custom scheme: $callbackScheme")
+                    intent.launch(authLauncher, authenticationUri, callbackScheme)
+                }
+                authStarted = true
+                return
+            } catch (e: ActivityNotFoundException) {
+                Log.e("flutter_web_auth_2", "ActivityNotFoundException: No browser available", e)
+                val callback = FlutterWebAuth2Plugin.callbacks[callbackScheme]
+                callback?.error("NO_BROWSER", "No browser available on this device.", e.message)
+                FlutterWebAuth2Plugin.callbacks.remove(callbackScheme)
+                finish()
+                return
             }
-
-            authStarted = true
-            return
         }
-        /* If the authentication was already started and we've returned here, the user either
-         * completed or cancelled authentication.
-         * Either way we want to return to our original flutter activity, so just finish here
-         */
+
         finish()
     }
 
